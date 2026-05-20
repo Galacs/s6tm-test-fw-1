@@ -47,6 +47,7 @@ CMakeFiles/
 cmake_install.cmake
 install_manifest.txt
 CTestTestfile.cmake
+.cache
 
 # Python environment files
 *.pyc

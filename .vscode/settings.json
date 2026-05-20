@@ -4,7 +4,7 @@
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
-  "idf.port": "detect",
+  "idf.port": "/dev/ttyACM0",
   "idf.currentSetup": "/home/galacs/.espressif/v5.5.4/esp-idf",
   "idf.customExtraVars": {
     "OPENOCD_SCRIPTS": "/home/galacs/.espressif/tools/openocd-esp32/v0.12.0-esp32-20240318/openocd-esp32/share/openocd/scripts",

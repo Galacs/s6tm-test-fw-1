@@ -49,7 +49,7 @@ audio_board_handle_t audio_board_init(void)
 audio_hal_handle_t audio_board_codec_init(void)
 {
     audio_hal_codec_config_t audio_codec_cfg = AUDIO_CODEC_DEFAULT_CONFIG();
-    audio_hal_handle_t codec_hal = audio_hal_init(&audio_codec_cfg, &AUDIO_NEW_CODEC_DEFAULT_HANDLE);
+    audio_hal_handle_t codec_hal = audio_hal_init(&audio_codec_cfg, &AUDIO_TLV320AIC31XX_DEFAULT_HANDLE);
     AUDIO_NULL_CHECK(TAG, codec_hal, return NULL);
     return codec_hal;
 }

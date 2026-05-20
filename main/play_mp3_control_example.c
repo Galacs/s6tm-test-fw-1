@@ -49,7 +49,7 @@ extern const uint8_t hr_mp3_end[]   asm("_binary_music_16b_2c_44100hz_mp3_end");
 
 static void set_next_file_marker()
 {
-    static int idx = 0;
+    static int idx = 2;
 
     switch (idx) {
         case 0:

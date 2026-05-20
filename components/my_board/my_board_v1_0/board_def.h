@@ -36,6 +36,14 @@
 #define BATTERY_DETECT_GPIO       -1
 #define SDCARD_INTR_GPIO          -1
 
+/*
+ * TLV320AIC31xx hardware reset pin (active-low).
+ * Pull low for ≥10 ms, then high; the codec requires ≥1 ms after release
+ * before the first I2C transaction (datasheet section 5.2).
+ * Set to -1 to skip the GPIO reset (software-reset only via reg 0x01).
+ */
+#define CODEC_RST_GPIO            16
+
 #define SDCARD_OPEN_FILE_NUM_MAX  5
 
 #define BOARD_PA_GAIN             (10) /* Power amplifier gain defined by board (dB) */
@@ -54,7 +62,7 @@
 #define ESP_SD_PIN_CD               -1
 #define ESP_SD_PIN_WP               -1
 
-extern audio_hal_func_t AUDIO_NEW_CODEC_DEFAULT_HANDLE;
+extern audio_hal_func_t AUDIO_TLV320AIC31XX_DEFAULT_HANDLE;
 
 #define AUDIO_CODEC_DEFAULT_CONFIG(){                   \
         .adc_input  = AUDIO_HAL_ADC_INPUT_LINE1,        \
