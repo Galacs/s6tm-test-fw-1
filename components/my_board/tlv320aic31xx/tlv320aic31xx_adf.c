@@ -190,8 +190,10 @@ esp_err_t tlv320_init(audio_hal_codec_config_t *cfg)
      *    Page 0, reg 0x42 = 0x18 (right DAC gain +12 dB)
      * ─────────────────────────────────────────────────────────────── */
     aic_write(AIC_DACMUTE,  0x00);
-    aic_write(AIC_LDACVOL,  0x18);
-    aic_write(AIC_RDACVOL,  0x18);
+    // aic_write(AIC_LDACVOL,  0x18);
+    // aic_write(AIC_RDACVOL,  0x18);
+    aic_write(AIC_LDACVOL, 0x0C);
+    aic_write(AIC_RDACVOL, 0x0C);
 
     /* ───────────────────────────────────────────────────────────────
      * 7. Switch to Page 1 for analog mixer / output registers
@@ -209,8 +211,10 @@ esp_err_t tlv320_init(audio_hal_codec_config_t *cfg)
     aic_write(AIC_HPDRIVER, 0xC4);
 
     /* Headphone gain: +3 dB (0x06) */
-    aic_write(AIC_HPLGAIN, 0x06);
-    aic_write(AIC_HPRGAIN, 0x06);
+    // aic_write(AIC_HPLGAIN, 0x06);
+    // aic_write(AIC_HPRGAIN, 0x06);
+    aic_write(AIC_HPLGAIN, 0x00);
+    aic_write(AIC_HPRGAIN, 0x00);
 
     /* Headphone pop‑suppression ramp (same as original) */
     aic_write(AIC_HPPOP, 0x4E);
@@ -218,13 +222,26 @@ esp_err_t tlv320_init(audio_hal_codec_config_t *cfg)
     /* Speaker amplifier: enable, class‑D gain 6 dB (0x86) */
     aic_write(AIC_SPKAMP, 0x86);
 
-    /* Speaker analog volume: 0 dB (0x00) – not used in the log, keep 0 */
-    aic_write(AIC_LANALOGSPL, 0x00);
-    aic_write(AIC_RANALOGSPR, 0x00);
+    // /* Speaker analog volume: 0 dB (0x00) – not used in the log, keep 0 */
+    // aic_write(AIC_LANALOGSPL, 0x00);
+    // aic_write(AIC_RANALOGSPR, 0x00);
 
     /* Speaker gain: +2.5 dB (0x05) */
     aic_write(AIC_SPLGAIN, 0x05);
     aic_write(AIC_SPRGAIN, 0x05);
+
+
+// aic_write(AIC_SPKAMP, 0x80);        // Enable speaker amp, 0 dB gain (instead of 0x86)
+// aic_write(AIC_SPLGAIN, 0x00);
+// aic_write(AIC_SPRGAIN, 0x00);
+// aic_write(AIC_LANALOGSPL, 0x7F);    // Start at max attenuation (-63.5 dB)
+// aic_write(AIC_RANALOGSPR, 0x7F);
+aic_write(AIC_SPKAMP, 0x80);
+// aic_write(AIC_SPLGAIN, 0x00);
+// aic_write(AIC_SPRGAIN, 0x00);
+// Set speaker analog volume to -32 dB (0x40) – audible but not deafening
+aic_write(AIC_LANALOGSPL, 0x20);
+aic_write(AIC_RANALOGSPR, 0x20); // <-- la
 
     /* Return to Page 0 (optional) */
     aic_write(AIC_PAGECTL, 0);
@@ -389,20 +406,82 @@ esp_err_t tlv320_set_mute(bool mute)
     return aic_write(AIC_DACMUTE, mute ? 0x0C : 0x00);
 }
 
+// esp_err_t tlv320_set_volume(int volume)
+// {
+//     /*
+//      * Digital volume register: two's complement, 0.5 dB/step.
+//      *   0x00 =  0 dB (loudest)
+//      *   0x81 = -63.5 dB
+//      * Map linear 0..100 → 0 dB..-40 dB (reg 0x00..0x50)
+//      */
+//     if (volume < 0)   volume = 0;
+//     if (volume > 100) volume = 100;
+//     uint8_t reg_val = (uint8_t)((100 - volume) * 0x50 / 100);
+//     aic_write(AIC_LDACVOL, reg_val);
+//     return aic_write(AIC_RDACVOL, reg_val);
+// }
+
 esp_err_t tlv320_set_volume(int volume)
 {
-    /*
-     * Digital volume register: two's complement, 0.5 dB/step.
-     *   0x00 =  0 dB (loudest)
-     *   0x81 = -63.5 dB
-     * Map linear 0..100 → 0 dB..-40 dB (reg 0x00..0x50)
-     */
-    if (volume < 0)   volume = 0;
+    if (volume < 0) volume = 0;
     if (volume > 100) volume = 100;
-    uint8_t reg_val = (uint8_t)((100 - volume) * 0x50 / 100);
-    aic_write(AIC_LDACVOL, reg_val);
-    return aic_write(AIC_RDACVOL, reg_val);
+
+    // Map 0..100 -> 0x7F..0x00 (0.5 dB steps)
+    uint8_t reg_val = ((100 - volume) * 0x7F) / 100;
+
+    // Only control headphone analog volume
+    aic_write(AIC_LANALOGHPL, 5);
+    aic_write(AIC_RANALOGHPR, 5);
+
+    ESP_LOGI(TAG, "Headphone analog volume set to 0x%02X (volume %d%%)", reg_val, volume);
+    return ESP_OK;
 }
+// esp_err_t tlv320_set_volume(int volume)
+// {
+//     if (volume < 0) volume = 0;
+//     if (volume > 100) volume = 100;
+//     // Map 0..100 to 0x7F..0x00 (0.5 dB steps, 0x7F = -63.5 dB, 0x00 = 0 dB)
+//     uint8_t reg_val = ((100 - volume) * 0x7F) / 100;
+//     aic_write(AIC_LDACVOL, 0x00);
+//     aic_write(AIC_RDACVOL, 0x00);
+//     aic_write(AIC_HPLGAIN, 0x00);
+//     aic_write(AIC_HPRGAIN, 0x00);
+//     aic_write(AIC_LANALOGHPL, 10);
+//     aic_write(AIC_RANALOGHPR, 10);
+//     ESP_LOGE(TAG, "volume set");
+//     return ESP_OK;
+// }
+// esp_err_t tlv320_set_volume(int volume)
+// {
+//     if (volume < 0) volume = 0;
+//     if (volume > 100) volume = 100;
+
+//     // Map 0..100 to 0x7F..0x00 (0.5 dB steps, 0x7F = -63.5 dB, 0x00 = 0 dB)
+//     uint8_t reg_val = ((100 - volume) * 0x7F) / 100;
+
+//     // Headphone analog volume
+//     aic_write(AIC_LANALOGHPL, reg_val);
+//     aic_write(AIC_RANALOGHPR, reg_val);
+
+//     // Speaker analog volume (critical for boards where speaker and HP share output)
+//     aic_write(AIC_LANALOGSPL, reg_val);
+//     aic_write(AIC_RANALOGSPR, reg_val);
+
+//     // Ensure digital volume is 0 dB (already set in init)
+//     aic_write(AIC_LDACVOL, 0x00);
+//     aic_write(AIC_RDACVOL, 0x00);
+
+//     // Set headphone gain to 0 dB (already in init, but safe to repeat)
+//     aic_write(AIC_HPLGAIN, 0x00);
+//     aic_write(AIC_HPRGAIN, 0x00);
+
+//     // Reduce speaker gain to 0 dB (instead of +2.5 dB)
+//     aic_write(AIC_SPLGAIN, 0x00);
+//     aic_write(AIC_SPRGAIN, 0x00);
+
+//     ESP_LOGI(TAG, "Volume set to %d%% -> analog volume 0x%02X", volume, reg_val);
+//     return ESP_OK;
+// }
 
 esp_err_t tlv320_get_volume(int *volume)
 {

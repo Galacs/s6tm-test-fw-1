@@ -36,8 +36,8 @@ static struct marker {
 } file_marker;
 
 // low rate mp3 audio
-extern const uint8_t lr_mp3_start[] asm("_binary_music_16b_2c_8000hz_mp3_start");
-extern const uint8_t lr_mp3_end[]   asm("_binary_music_16b_2c_8000hz_mp3_end");
+extern const uint8_t lr_mp3_start[] asm("_binary_music_16b_2c_44100hz_mp3_start");
+extern const uint8_t lr_mp3_end[]   asm("_binary_music_16b_2c_44100hz_mp3_end");
 
 // medium rate mp3 audio
 extern const uint8_t mr_mp3_start[] asm("_binary_music_16b_2c_22050hz_mp3_start");
@@ -148,6 +148,7 @@ void app_main(void)
     ESP_LOGI(TAG, "[ 5.1 ] Start audio_pipeline");
     set_next_file_marker();
     audio_pipeline_run(pipeline);
+    audio_hal_set_volume(board_handle->audio_hal, 60);
 
     while (1) {
         audio_event_iface_msg_t msg;
