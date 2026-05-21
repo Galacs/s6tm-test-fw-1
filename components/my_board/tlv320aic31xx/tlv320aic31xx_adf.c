@@ -255,10 +255,13 @@ esp_err_t tlv320_init(audio_hal_codec_config_t *cfg)
     // aic_write(AIC_RANALOGHPR, 10);
 
     aic_write(AIC_HPDRIVER, 0xC0);
-    aic_write(AIC_HPLGAIN, 0x04);
-    aic_write(AIC_HPRGAIN, 0x04);
-    aic_write(AIC_LANALOGHPL, 0x40);
-    aic_write(AIC_RANALOGHPR, 0x40);
+    // 1 dB gain, unmuted:  (1 << 3) | 0x04 = 0x0C
+    // 2 dB gain, unmuted:  (2 << 3) | 0x04 = 0x14
+    // 3 dB gain, unmuted:  (3 << 3) | 0x04 = 0x1C
+    aic_write(AIC_HPLGAIN, 0x14);
+    aic_write(AIC_HPRGAIN, 0x14);
+    aic_write(AIC_LANALOGHPL, 0x00); // <-- la
+    aic_write(AIC_RANALOGHPR, 0x00);
     aic_write(AIC_HPCONTROL, 0x0C);
 
     /* Speaker amplifier: enable, class‑D gain 6 dB (0x86) */
