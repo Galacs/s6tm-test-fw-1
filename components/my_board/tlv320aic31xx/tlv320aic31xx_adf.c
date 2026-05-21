@@ -109,6 +109,43 @@ static esp_err_t aic_write(uint16_t reg, uint8_t val)
     return ret;
 }
 
+static uint8_t aic_read(uint16_t reg)
+{
+    uint8_t page    = (uint8_t)(reg / 128);
+    uint8_t reg_off = (uint8_t)(reg % 128);
+    uint8_t val     = 0xFF;
+
+    /* Select page */
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, (AIC_I2C_ADDR << 1) | I2C_MASTER_WRITE, true);
+    i2c_master_write_byte(cmd, 0x00, true);
+    i2c_master_write_byte(cmd, page, true);
+    i2c_master_stop(cmd);
+    i2c_master_cmd_begin(AIC_I2C_PORT, cmd, pdMS_TO_TICKS(50));
+    i2c_cmd_link_delete(cmd);
+
+    /* Write register address */
+    cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, (AIC_I2C_ADDR << 1) | I2C_MASTER_WRITE, true);
+    i2c_master_write_byte(cmd, reg_off, true);
+    i2c_master_stop(cmd);
+    i2c_master_cmd_begin(AIC_I2C_PORT, cmd, pdMS_TO_TICKS(50));
+    i2c_cmd_link_delete(cmd);
+
+    /* Read */
+    cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, (AIC_I2C_ADDR << 1) | I2C_MASTER_READ, true);
+    i2c_master_read_byte(cmd, &val, I2C_MASTER_NACK);
+    i2c_master_stop(cmd);
+    i2c_master_cmd_begin(AIC_I2C_PORT, cmd, pdMS_TO_TICKS(50));
+    i2c_cmd_link_delete(cmd);
+
+    return val;
+}
+
 /* ── Init ────────────────────────────────────────────────────────────────── */
 
 esp_err_t tlv320_init(audio_hal_codec_config_t *cfg)
@@ -136,13 +173,18 @@ esp_err_t tlv320_init(audio_hal_codec_config_t *cfg)
 
     /* ── Software reset ───────────────────────────────────────────── */
     aic_write(AIC_RESET, 0x01);
-    vTaskDelay(pdMS_TO_TICKS(10));
+    vTaskDelay(pdMS_TO_TICKS(20));
 
     /* ───────────────────────────────────────────────────────────────
      * 1. Audio interface: I2S, 16‑bit, slave
      *    (Page 0, reg 0x1B = 0x00)
      * ─────────────────────────────────────────────────────────────── */
     aic_write(AIC_IFACE1, 0x00);
+    aic_write(AIC_PLLPR,   0x12);   // P=1, R=2, power off
+    aic_write(AIC_PLLJ,    0x2C);   // J=44
+    aic_write(AIC_PLLDMSB, 0x00);
+    aic_write(AIC_PLLDLSB, 0x00);
+    aic_write(AIC_PLLPR,   0x92);   // power on
 
     /* ───────────────────────────────────────────────────────────────
      * 2. Clock mux: PLL source = BCLK, CODEC_CLKIN = PLL output
@@ -158,11 +200,6 @@ esp_err_t tlv320_init(audio_hal_codec_config_t *cfg)
      *    Page 0, reg 0x05 = 0x12 (PLLPR: P=1,R=2, power off)
      *    Page 0, reg 0x05 = 0x92 (PLLPR: power on)
      * ─────────────────────────────────────────────────────────────── */
-    aic_write(AIC_PLLJ,    0x2C);
-    aic_write(AIC_PLLDLSB, 0x00);
-    aic_write(AIC_PLLDMSB, 0x00);
-    aic_write(AIC_PLLPR,   0x12);
-    aic_write(AIC_PLLPR,   0x92);
     vTaskDelay(pdMS_TO_TICKS(15));   // wait for PLL lock
 
     /* ───────────────────────────────────────────────────────────────
@@ -192,8 +229,8 @@ esp_err_t tlv320_init(audio_hal_codec_config_t *cfg)
     aic_write(AIC_DACMUTE,  0x00);
     // aic_write(AIC_LDACVOL,  0x18);
     // aic_write(AIC_RDACVOL,  0x18);
-    aic_write(AIC_LDACVOL, 0x0C);
-    aic_write(AIC_RDACVOL, 0x0C);
+    aic_write(AIC_LDACVOL, 0x00);
+    aic_write(AIC_RDACVOL, 0x00);
 
     /* ───────────────────────────────────────────────────────────────
      * 7. Switch to Page 1 for analog mixer / output registers
@@ -203,21 +240,26 @@ esp_err_t tlv320_init(audio_hal_codec_config_t *cfg)
     /* DAC mixer routing: DAC_L → HPL vol, DAC_R → HPR vol (0x44) */
     aic_write(AIC_DACMIXERROUTE, 0x44);
 
-    /* Headphone analog volume: -32 dB (0x40) */
-    aic_write(AIC_LANALOGHPL, 0x40);
-    aic_write(AIC_RANALOGHPR, 0x40);
-
+    /* Headphone pop‑suppression ramp (same as original) */
+    aic_write(AIC_HPPOP, 0x4E);
     /* Headphone driver: enable both channels (0xC4) */
     aic_write(AIC_HPDRIVER, 0xC4);
-
+    /* Headphone analog volume: -32 dB (0x40) */
     /* Headphone gain: +3 dB (0x06) */
     // aic_write(AIC_HPLGAIN, 0x06);
     // aic_write(AIC_HPRGAIN, 0x06);
-    aic_write(AIC_HPLGAIN, 0x00);
-    aic_write(AIC_HPRGAIN, 0x00);
 
-    /* Headphone pop‑suppression ramp (same as original) */
-    aic_write(AIC_HPPOP, 0x4E);
+    // aic_write(AIC_HPLGAIN, 2); // <-- EARRAPE
+    // aic_write(AIC_HPRGAIN, 2);
+    // aic_write(AIC_LANALOGHPL, 10);
+    // aic_write(AIC_RANALOGHPR, 10);
+
+    aic_write(AIC_HPDRIVER, 0xC0);
+    aic_write(AIC_HPLGAIN, 0x04);
+    aic_write(AIC_HPRGAIN, 0x04);
+    aic_write(AIC_LANALOGHPL, 0x40);
+    aic_write(AIC_RANALOGHPR, 0x40);
+    aic_write(AIC_HPCONTROL, 0x0C);
 
     /* Speaker amplifier: enable, class‑D gain 6 dB (0x86) */
     aic_write(AIC_SPKAMP, 0x86);
@@ -403,7 +445,8 @@ esp_err_t tlv320_config_i2s(audio_hal_codec_mode_t mode, audio_hal_codec_i2s_ifa
 esp_err_t tlv320_set_mute(bool mute)
 {
     /* DACMUTE bits[3:2]: 11=muted, 00=unmuted */
-    return aic_write(AIC_DACMUTE, mute ? 0x0C : 0x00);
+    // return aic_write(AIC_DACMUTE, mute ? 0x0C : 0x00);
+    return ESP_OK;
 }
 
 // esp_err_t tlv320_set_volume(int volume)
@@ -421,21 +464,51 @@ esp_err_t tlv320_set_mute(bool mute)
 //     return aic_write(AIC_RDACVOL, reg_val);
 // }
 
+// esp_err_t tlv320_set_volume(int volume)
+// {
+//     if (volume < 0) volume = 0;
+//     if (volume > 100) volume = 100;
+
+//     // Map 0..100 -> 0x7F..0x00 (0.5 dB steps)
+//     uint8_t reg_val = ((100 - volume) * 0x7F) / 100;
+
+//     // Only control headphone analog volume
+//     aic_write(AIC_LANALOGHPL, 5);
+//     aic_write(AIC_RANALOGHPR, 5);
+
+//     ESP_LOGI(TAG, "Headphone analog volume set to 0x%02X (volume %d%%)", reg_val, volume);
+//     return ESP_OK;
+// }
 esp_err_t tlv320_set_volume(int volume)
 {
-    if (volume < 0) volume = 0;
-    if (volume > 100) volume = 100;
+    // if (volume < 0)   volume = 0;
+    // if (volume > 100) volume = 100;
+    // uint8_t reg_val = (uint8_t)(((100 - volume) * 0x7F) / 100);
 
-    // Map 0..100 -> 0x7F..0x00 (0.5 dB steps)
-    uint8_t reg_val = ((100 - volume) * 0x7F) / 100;
+    // /* Disable HP driver first */
+    // aic_write(AIC_HPDRIVER, 0x00);
+    // aic_write(AIC_LANALOGHPL, 20);
+    // aic_write(AIC_RANALOGHPR, 20);
+    // aic_write(AIC_HPDRIVER, 0xC4);
 
-    // Only control headphone analog volume
-    aic_write(AIC_LANALOGHPL, 5);
-    aic_write(AIC_RANALOGHPR, 5);
+    // /* --- DIAGNOSTIC: read back to confirm the write landed --- */
+    // uint8_t rb = aic_read(AIC_LANALOGHPL);
+    // ESP_LOGE(TAG, "LANALOGHPL wrote 0x%02X, read back 0x%02X", reg_val, rb);
 
-    ESP_LOGI(TAG, "Headphone analog volume set to 0x%02X (volume %d%%)", reg_val, volume);
+    // aic_write(AIC_LANALOGSPL, 45);
+    // aic_write(AIC_RANALOGSPR, 45);
     return ESP_OK;
 }
+// esp_err_t tlv320_set_volume(int volume)
+// {
+//     aic_write(AIC_HPDRIVER, 0x00);
+//     aic_write(AIC_LANALOGHPL, 0);
+//     aic_write(AIC_RANALOGHPR, 0);
+//     aic_write(AIC_HPDRIVER, 0xC4);
+//     aic_write(AIC_LANALOGSPL, 45);
+//     aic_write(AIC_RANALOGSPR, 45);
+//     return ESP_OK;
+// }
 // esp_err_t tlv320_set_volume(int volume)
 // {
 //     if (volume < 0) volume = 0;

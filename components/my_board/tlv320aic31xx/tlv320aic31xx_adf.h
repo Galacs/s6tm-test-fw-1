@@ -48,6 +48,8 @@ extern "C" {
 #define AIC_HPRGAIN           AIC_REG(1, 41)
 #define AIC_SPLGAIN           AIC_REG(1, 42)
 #define AIC_SPRGAIN           AIC_REG(1, 43)
+#define AIC_HPCONTROL	      AIC_REG(1, 44)
+
 
 /* ── CLKMUX field values ────────────────────────────────────────────────── */
 #define AIC_PLL_CLKIN_BCLK    (0x01 << 2)   /* PLL source = BCLK */
