@@ -140,7 +140,6 @@ void app_main(void)
     audio_event_iface_set_listener(esp_periph_set_get_event_iface(set), evt);
 
     ESP_LOGW(TAG, "[ 5 ] Tap touch buttons to control music player:");
-    ESP_LOGW(TAG, "      [Play] to start, pause and resume, [Set] to stop.");
     ESP_LOGW(TAG, "      [Vol-] or [Vol+] to adjust volume.");
 
     ESP_LOGI(TAG, "[ 5.1 ] Start audio_pipeline");
@@ -150,8 +149,7 @@ void app_main(void)
 
     while (1) {
         audio_event_iface_msg_t msg;
-        esp_err_t ret = audio_event_iface_listen(evt, &msg, portMAX_DELAY);
-        if (ret != ESP_OK) {
+        if (audio_event_iface_listen(evt, &msg, portMAX_DELAY) != ESP_OK) {
             continue;
         }
 
@@ -166,47 +164,7 @@ void app_main(void)
         }
 
         if (msg.source_type == PERIPH_ID_BUTTON && msg.cmd == PERIPH_BUTTON_PRESSED) {
-            if ((int) msg.data == get_input_play_id()) {
-                ESP_LOGI(TAG, "[ * ] [Play] touch tap event");
-                audio_element_state_t el_state = audio_element_get_state(i2s_stream_writer);
-                switch (el_state) {
-                    case AEL_STATE_INIT :
-                        ESP_LOGI(TAG, "[ * ] Starting audio pipeline");
-                        audio_pipeline_run(pipeline);
-                        break;
-                    case AEL_STATE_RUNNING :
-                        ESP_LOGI(TAG, "[ * ] Pausing audio pipeline");
-                        audio_pipeline_pause(pipeline);
-                        break;
-                    case AEL_STATE_PAUSED :
-                        ESP_LOGI(TAG, "[ * ] Resuming audio pipeline");
-                        audio_pipeline_resume(pipeline);
-                        break;
-                    case AEL_STATE_FINISHED :
-                        ESP_LOGI(TAG, "[ * ] Rewinding audio pipeline");
-                        audio_pipeline_reset_ringbuffer(pipeline);
-                        audio_pipeline_reset_elements(pipeline);
-                        audio_pipeline_change_state(pipeline, AEL_STATE_INIT);
-                        set_next_file_marker();
-                        audio_pipeline_run(pipeline);
-                        break;
-                    default :
-                        ESP_LOGI(TAG, "[ * ] Not supported state %d", el_state);
-                }
-            } else if ((int) msg.data == get_input_set_id()) {
-                ESP_LOGI(TAG, "[ * ] [Set] touch tap event");
-                ESP_LOGI(TAG, "[ * ] Stopping audio pipeline");
-                break;
-            } else if ((int) msg.data == get_input_mode_id()) {
-                ESP_LOGI(TAG, "[ * ] [mode] tap event");
-                audio_pipeline_stop(pipeline);
-                audio_pipeline_wait_for_stop(pipeline);
-                audio_pipeline_terminate(pipeline);
-                audio_pipeline_reset_ringbuffer(pipeline);
-                audio_pipeline_reset_elements(pipeline);
-                set_next_file_marker();
-                audio_pipeline_run(pipeline);
-            } else if ((int) msg.data == get_input_volup_id()) {
+            if ((int) msg.data == get_input_volup_id()) {
                 ESP_LOGI(TAG, "[ * ] [Vol+] touch tap event");
                 player_volume += 10;
                 if (player_volume > 100) {
