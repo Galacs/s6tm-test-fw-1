@@ -17,6 +17,7 @@
 #include "periph_button.h"
 #include "board.h"
 #include "periph_encoder.h"
+#include "equalizer.h"
 
 #include "sdcard_list.h"
 #include "sdcard_scan.h"
@@ -24,7 +25,7 @@
 static const char *TAG = "S6TM_MAIN";
 
 audio_pipeline_handle_t pipeline;
-audio_element_handle_t i2s_stream_writer, mp3_decoder, fatfs_stream_reader;
+audio_element_handle_t i2s_stream_writer, mp3_decoder, fatfs_stream_reader, equalizer;
 playlist_operator_handle_t sdcard_list_handle = NULL;
 
 int player_volume;
@@ -152,6 +153,12 @@ void app_main(void) {
     mp3_decoder_cfg_t mp3_cfg = DEFAULT_MP3_DECODER_CONFIG();
     mp3_decoder = mp3_decoder_init(&mp3_cfg);
 
+    equalizer_cfg_t eq_cfg = DEFAULT_EQUALIZER_CONFIG();
+    int set_gain[] = { -13, -13, -13, -13, -13, -13, -13, -13, -13, -13,
+                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    eq_cfg.set_gain = set_gain;
+    equalizer = equalizer_init(&eq_cfg);
+
     ESP_LOGI(TAG, "[2.2] Create i2s stream to write data to codec chip");
     i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
     i2s_cfg.type = AUDIO_STREAM_WRITER;
@@ -168,11 +175,12 @@ void app_main(void) {
     ESP_LOGI(TAG, "[2.3] Register all elements to audio pipeline");
     audio_pipeline_register(pipeline, fatfs_stream_reader, "file");
     audio_pipeline_register(pipeline, mp3_decoder, "mp3");
+    audio_pipeline_register(pipeline, equalizer, "equalizer");
     audio_pipeline_register(pipeline, i2s_stream_writer, "i2s");
 
-    ESP_LOGI(TAG, "[2.4] Link it together [sd]-->file-->mp3_decoder-->i2s_stream-->[codec_chip]");
-    const char *link_tag[3] = {"file", "mp3", "i2s"};
-    audio_pipeline_link(pipeline, &link_tag[0], 3);
+    ESP_LOGI(TAG, "[2.4] Link it together [sd]-->file-->mp3_decoder-->equalizer-->i2s_stream-->[codec_chip]");
+    const char *link_tag[4] = {"file", "mp3", "equalizer", "i2s"};
+    audio_pipeline_link(pipeline, &link_tag[0], 4);
 
     ESP_LOGI(TAG, "[ 4 ] Set up  event listener");
     audio_event_iface_cfg_t evt_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
@@ -200,7 +208,10 @@ void app_main(void) {
                 audio_element_getinfo(mp3_decoder, &music_info);
                 ESP_LOGI(TAG, "[ * ] Received music info from mp3 decoder, sample_rates=%d, bits=%d, ch=%d",
                          music_info.sample_rates, music_info.bits, music_info.channels);
-                // audio_element_setinfo(i2s_stream_writer, &music_info);
+                audio_element_setinfo(i2s_stream_writer, &music_info);
+                if (equalizer_set_info(equalizer, music_info.sample_rates, music_info.channels) != ESP_OK) {
+                    break;
+                }
                 i2s_stream_set_clk(i2s_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
                 continue;
             }
@@ -229,6 +240,7 @@ void app_main(void) {
     audio_pipeline_terminate(pipeline);
     audio_pipeline_unregister(pipeline, fatfs_stream_reader);
     audio_pipeline_unregister(pipeline, mp3_decoder);
+    audio_pipeline_unregister(pipeline, equalizer);
     audio_pipeline_unregister(pipeline, i2s_stream_writer);
 
     /* Terminate the pipeline before removing the listener */
@@ -244,6 +256,7 @@ void app_main(void) {
     sdcard_list_destroy(sdcard_list_handle);
     audio_pipeline_deinit(pipeline);
     audio_element_deinit(i2s_stream_writer);
+    audio_element_deinit(equalizer);
     audio_element_deinit(mp3_decoder);
     audio_element_deinit(fatfs_stream_reader);
 }
