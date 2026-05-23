@@ -260,6 +260,7 @@ void app_main(void) {
 
     ESP_LOGI(TAG, "[ 5.1 ] Start audio_pipeline");
     audio_hal_set_volume(board_handle->audio_hal, 20);
+    gpio_set_level(21, 0);
 
     while (1) {
         audio_event_iface_msg_t msg;

@@ -406,6 +406,16 @@ void tlv320_set_adc_gain(float adcGain) {
 }
 
 esp_err_t tlv320_init(audio_hal_codec_config_t *cfg) {
+    // Mute amp
+    gpio_config_t io = {
+        .pin_bit_mask = 1ULL << 21,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io);
+    gpio_set_level(21, 1);
     ESP_ERROR_CHECK(i2c_master_init());
     int rst_gpio = 16;   // or get_codec_rst_gpio()
     if (rst_gpio >= 0) {
