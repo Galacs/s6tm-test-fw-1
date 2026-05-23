@@ -36,6 +36,25 @@ playlist_operator_handle_t sdcard_list_handle = NULL;
 
 int player_volume = 10;
 
+void update_title(char* msg) {
+    if (esp_lv_adapter_lock(-1) == ESP_OK) {
+        lv_label_set_text(label, msg);
+        esp_lv_adapter_unlock();
+    }
+}
+
+static const char* url_to_title(const char *url) {
+    if (url == NULL) return "";
+    const char *title = strrchr(url, '/');
+    title = title ? title + 1 : url;
+    static char buf[64];
+    strncpy(buf, title, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    char *dot = strrchr(buf, '.');
+    if (dot) *dot = '\0';
+    return buf;
+}
+
 static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_service_event_t *evt, void *ctx) {
     audio_board_handle_t board_handle = (audio_board_handle_t) ctx;
     ESP_LOGE(TAG, "CB fired type=%d data=%d", evt->type, (int)evt->data);
@@ -71,11 +90,7 @@ static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_ser
                 audio_pipeline_terminate(pipeline);
                 sdcard_list_next(sdcard_list_handle, 1, &url);
                 ESP_LOGW(TAG, "URL: %s", url);
-                if (esp_lv_adapter_lock(-1) == ESP_OK) {
-                    lv_label_set_text(label, url);
-                    esp_lv_adapter_unlock();
-                    ESP_LOGW(TAG, "set new display URL: %s", url);
-                }
+                update_title(url_to_title(url));
                 audio_element_set_uri(fatfs_stream_reader, url);
                 audio_pipeline_reset_ringbuffer(pipeline);
                 audio_pipeline_reset_elements(pipeline);
@@ -174,7 +189,7 @@ void init_lvgl(void) {
     // Step 5: Draw with LVGL (guarded by adapter lock for thread safety)
     if (esp_lv_adapter_lock(-1) == ESP_OK) {
         label = lv_label_create(lv_scr_act());
-        lv_label_set_text(label, "なに駆け - This is a very long scrolling text that will move horizontally across your display");
+        lv_label_set_text(label, "Démarrage...");
         lv_obj_set_width(label, 100);
         lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
         lv_obj_center(label);
@@ -249,6 +264,7 @@ void app_main(void) {
     fatfs_cfg.type = AUDIO_STREAM_READER;
     fatfs_stream_reader = fatfs_stream_init(&fatfs_cfg);
     audio_element_set_uri(fatfs_stream_reader, url);
+    update_title(url_to_title(url));
 
     ESP_LOGI(TAG, "[2.3] Register all elements to audio pipeline");
     audio_pipeline_register(pipeline, fatfs_stream_reader, "file");
@@ -303,6 +319,7 @@ void app_main(void) {
                     sdcard_list_next(sdcard_list_handle, 1, &url);
                     ESP_LOGW(TAG, "URL: %s", url);
                     audio_element_set_uri(fatfs_stream_reader, url);
+                    update_title(url_to_title(url));
                     audio_pipeline_reset_ringbuffer(pipeline);
                     audio_pipeline_reset_elements(pipeline);
                     audio_pipeline_change_state(pipeline, AEL_STATE_INIT);
