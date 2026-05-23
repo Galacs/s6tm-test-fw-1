@@ -22,6 +22,10 @@
 #include "sdcard_list.h"
 #include "sdcard_scan.h"
 
+#include "esp_lv_adapter.h"
+#include "esp_lcd_panel_ssd1306.h"
+#include "driver/i2c_master.h"
+
 static const char *TAG = "S6TM_MAIN";
 
 audio_pipeline_handle_t pipeline;
@@ -106,6 +110,68 @@ static esp_err_t periph_event_cb(audio_event_iface_msg_t *event, void *context) 
     return ESP_OK;
 }
 
+void init_lvgl(void) {
+    // Step 0: Create your esp_lcd panel and (optionally) panel_io with esp_lcd APIs
+    esp_lcd_panel_handle_t panel = NULL;
+    esp_lcd_panel_io_handle_t panel_io = NULL;
+    esp_lcd_panel_io_i2c_config_t io_config = {
+        .dev_addr = 0x3C,
+        .scl_speed_hz = 100000,
+        .control_phase_bytes = 1,
+        .lcd_cmd_bits = 8,
+        .lcd_param_bits = 8,
+        .dc_bit_offset = 6,
+    };
+    i2c_master_bus_handle_t i2c_bus = NULL;
+    i2c_master_get_bus_handle(I2C_NUM_0, &i2c_bus);
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(i2c_bus, &io_config, &panel_io));
+    esp_lcd_panel_dev_config_t panel_config = {
+        .bits_per_pixel = 1,
+        .reset_gpio_num = -1,
+    };
+    esp_lcd_panel_ssd1306_config_t ssd1306_config = {
+        .height = 64
+    };
+    panel_config.vendor_config = &ssd1306_config;
+    ESP_ERROR_CHECK(esp_lcd_new_panel_ssd1306(panel_io, &panel_config, &panel));
+    ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
+    ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
+    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
+
+    // Step 1: Initialize the adapter
+    esp_lv_adapter_config_t cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG();
+    ESP_ERROR_CHECK(esp_lv_adapter_init(&cfg));
+
+    // Step 2: Register a display (choose macro by interface)
+    esp_lv_adapter_display_config_t disp_cfg = ESP_LV_ADAPTER_DISPLAY_SPI_WITHOUT_PSRAM_DEFAULT_CONFIG(
+        panel,           // LCD panel handle
+        panel_io,        // LCD panel IO handle (can be NULL for some interfaces)
+        128,             // Horizontal resolution
+        64,             // Vertical resolution
+        ESP_LV_ADAPTER_ROTATE_0 // Rotation
+    );
+    lv_display_t *disp = esp_lv_adapter_register_display(&disp_cfg);
+    assert(disp != NULL);
+
+    // Step 3: (Optional) Register input device(s)
+    // Create touch handle using esp_lcd_touch API (implementation omitted here)
+    // esp_lcd_touch_handle_t touch_handle = /* ... */;
+    // esp_lv_adapter_touch_config_t touch_cfg = ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(disp, touch_handle);
+    // lv_indev_t *touch = esp_lv_adapter_register_touch(&touch_cfg);
+    // assert(touch != NULL);
+
+    // Step 4: Start the adapter task
+    ESP_ERROR_CHECK(esp_lv_adapter_start());
+
+    // Step 5: Draw with LVGL (guarded by adapter lock for thread safety)
+    if (esp_lv_adapter_lock(-1) == ESP_OK) {
+        lv_obj_t *label = lv_label_create(lv_scr_act());
+        lv_label_set_text(label, "Hello LVGL!");
+        lv_obj_center(label);
+        esp_lv_adapter_unlock();
+    }
+}
+
 void app_main(void) {
     esp_log_level_set("*", ESP_LOG_WARN);
     esp_log_level_set(TAG, ESP_LOG_INFO);
@@ -135,6 +201,8 @@ void app_main(void) {
     esp_periph_set_register_callback(set, periph_event_cb, (void *)board_handle);
     audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_DECODE, AUDIO_HAL_CTRL_START);
     audio_hal_get_volume(board_handle->audio_hal, &player_volume);
+
+    init_lvgl();
 
     ESP_LOGI(TAG, "[ 3 ] Create and start input key service");
     input_key_service_info_t input_key_info[] = INPUT_KEY_DEFAULT_INFO();
