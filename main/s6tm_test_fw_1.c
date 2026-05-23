@@ -28,6 +28,8 @@
 
 static const char *TAG = "S6TM_MAIN";
 
+lv_obj_t *label;
+
 audio_pipeline_handle_t pipeline;
 audio_element_handle_t i2s_stream_writer, mp3_decoder, fatfs_stream_reader, equalizer;
 playlist_operator_handle_t sdcard_list_handle = NULL;
@@ -69,6 +71,11 @@ static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_ser
                 audio_pipeline_terminate(pipeline);
                 sdcard_list_next(sdcard_list_handle, 1, &url);
                 ESP_LOGW(TAG, "URL: %s", url);
+                if (esp_lv_adapter_lock(-1) == ESP_OK) {
+                    lv_label_set_text(label, url);
+                    esp_lv_adapter_unlock();
+                    ESP_LOGW(TAG, "set new display URL: %s", url);
+                }
                 audio_element_set_uri(fatfs_stream_reader, url);
                 audio_pipeline_reset_ringbuffer(pipeline);
                 audio_pipeline_reset_elements(pipeline);
@@ -166,8 +173,10 @@ void init_lvgl(void) {
 
     // Step 5: Draw with LVGL (guarded by adapter lock for thread safety)
     if (esp_lv_adapter_lock(-1) == ESP_OK) {
-        lv_obj_t *label = lv_label_create(lv_scr_act());
-        lv_label_set_text(label, "Hello LVGL !");
+        label = lv_label_create(lv_scr_act());
+        lv_label_set_text(label, "なに駆け - This is a very long scrolling text that will move horizontally across your display");
+        lv_obj_set_width(label, 100);
+        lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
         lv_obj_center(label);
         esp_lv_adapter_unlock();
     }
@@ -182,7 +191,6 @@ void app_main(void) {
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
     ESP_LOGI(TAG, "[3.1] Initialize keys on board");
     audio_board_key_init(set);
-    audio_board_sdcard_init(set, SD_MODE_1_LINE);
 
     periph_encoder_cfg_t enc_cfg = {
         .gpio_a = 38,
@@ -192,11 +200,6 @@ void app_main(void) {
     esp_periph_handle_t encoder = periph_encoder_init(&enc_cfg);
     esp_periph_start(set, encoder);
 
-    ESP_LOGI(TAG, "[3.2] Set up a sdcard playlist and scan sdcard music save to it");
-    sdcard_list_create(&sdcard_list_handle);
-    sdcard_scan(sdcard_url_save_cb, "/sdcard", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
-    sdcard_list_show(sdcard_list_handle);
-
     ESP_LOGI(TAG, "[ 1 ] Start audio codec chip");
     audio_board_handle_t board_handle = audio_board_init();
     esp_periph_set_register_callback(set, periph_event_cb, (void *)board_handle);
@@ -204,6 +207,12 @@ void app_main(void) {
     audio_hal_get_volume(board_handle->audio_hal, &player_volume);
 
     init_lvgl();
+
+    ESP_LOGI(TAG, "[3.2] Set up a sdcard playlist and scan sdcard music save to it");
+    audio_board_sdcard_init(set, SD_MODE_1_LINE);
+    sdcard_list_create(&sdcard_list_handle);
+    sdcard_scan(sdcard_url_save_cb, "/sdcard", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
+    sdcard_list_show(sdcard_list_handle);
 
     ESP_LOGI(TAG, "[ 3 ] Create and start input key service");
     input_key_service_info_t input_key_info[] = INPUT_KEY_DEFAULT_INFO();
