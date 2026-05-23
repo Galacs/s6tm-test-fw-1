@@ -18,7 +18,7 @@ static const char *TAG = "tlv320";
 #define AIC_I2C_FREQ    100000
 
 #define MIN_VOL_DB -60
-#define MAX_VOL_DB -20
+#define MAX_VOL_DB 0
 
 esp_err_t tlv_320_set_page(uint8_t page);
 
@@ -446,7 +446,7 @@ esp_err_t tlv320_init(audio_hal_codec_config_t *cfg) {
     tlv320_enable_headphone_amp();
     tlv320_set_headphone_mute(false);
     tlv320_set_headphone_volume(-35.0f, -35.0f); // 0dB
-    tlv320_set_headphone_gain(0.0f, 0.0f);
+    tlv320_set_headphone_gain(9.0f, 9.0f);
     tlv320_set_headphone_line_mode(true);
 
     // tlv320_enable_speaker_amp();

@@ -28,7 +28,7 @@ audio_pipeline_handle_t pipeline;
 audio_element_handle_t i2s_stream_writer, mp3_decoder, fatfs_stream_reader, equalizer;
 playlist_operator_handle_t sdcard_list_handle = NULL;
 
-int player_volume;
+int player_volume = 10;
 
 static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_service_event_t *evt, void *ctx) {
     audio_board_handle_t board_handle = (audio_board_handle_t) ctx;
@@ -88,14 +88,14 @@ static esp_err_t periph_event_cb(audio_event_iface_msg_t *event, void *context) 
     audio_board_handle_t board_handle = (audio_board_handle_t)context;
     if (event->source_type == PERIPH_ID_ENCODER) {
         if (event->cmd == PERIPH_ENCODER_CW) {
-            player_volume += 5;
+            player_volume += 2;
             if (player_volume > 100) {
                 player_volume = 100;
             }
             audio_hal_set_volume(board_handle->audio_hal, player_volume);
         } else if (event->cmd == PERIPH_ENCODER_CCW) {
             // ESP_LOGI(TAG, "[ * ] [Vol-] input key event");
-            player_volume -= 5;
+            player_volume -= 2;
             if (player_volume < 0) {
                 player_volume = 0;
             }
@@ -154,7 +154,7 @@ void app_main(void) {
     mp3_decoder = mp3_decoder_init(&mp3_cfg);
 
     equalizer_cfg_t eq_cfg = DEFAULT_EQUALIZER_CONFIG();
-    int set_gain[] = { -13, -13, -13, -13, -13, -13, -13, -13, -13, -13,
+    int set_gain[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     eq_cfg.set_gain = set_gain;
     equalizer = equalizer_init(&eq_cfg);
