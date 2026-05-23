@@ -28,9 +28,9 @@
 #define BUTTON_VOLUP_ID           -1
 #define BUTTON_VOLDOWN_ID         -1
 #define BUTTON_MUTE_ID            -1
-#define BUTTON_SET_ID              3
+#define BUTTON_SET_ID              4
 #define BUTTON_MODE_ID            -1
-#define BUTTON_PLAY_ID            40
+#define BUTTON_PLAY_ID             3
 #define PA_ENABLE_GPIO            -1
 #define ADC_DETECT_GPIO           -1
 #define BATTERY_DETECT_GPIO       -1
