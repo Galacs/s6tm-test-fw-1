@@ -16,6 +16,7 @@
 #include "input_key_service.h"
 #include "periph_button.h"
 #include "board.h"
+#include "periph_encoder.h"
 
 #include "sdcard_list.h"
 #include "sdcard_scan.h"
@@ -30,6 +31,7 @@ int player_volume;
 
 static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_service_event_t *evt, void *ctx) {
     audio_board_handle_t board_handle = (audio_board_handle_t) ctx;
+    ESP_LOGE(TAG, "CB fired type=%d data=%d", evt->type, (int)evt->data);
     if (evt->type == INPUT_KEY_SERVICE_ACTION_CLICK_RELEASE) {
         ESP_LOGI(TAG, "[ * ] input key id is %d", (int)evt->data);
         switch ((int)evt->data) {
@@ -68,22 +70,8 @@ static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_ser
                 audio_pipeline_run(pipeline);
                 break;
             case INPUT_KEY_USER_ID_VOLUP:
-                ESP_LOGI(TAG, "[ * ] [Vol+] input key event");
-                player_volume += 10;
-                if (player_volume > 100) {
-                    player_volume = 100;
-                }
-                audio_hal_set_volume(board_handle->audio_hal, player_volume);
-                ESP_LOGI(TAG, "[ * ] Volume set to %d %%", player_volume);
                 break;
             case INPUT_KEY_USER_ID_VOLDOWN:
-                ESP_LOGI(TAG, "[ * ] [Vol-] input key event");
-                player_volume -= 10;
-                if (player_volume < 0) {
-                    player_volume = 0;
-                }
-                audio_hal_set_volume(board_handle->audio_hal, player_volume);
-                ESP_LOGI(TAG, "[ * ] Volume set to %d %%", player_volume);
                 break;
         }
     }
@@ -99,6 +87,28 @@ void sdcard_url_save_cb(void *user_data, char *url) {
     }
 }
 
+static esp_err_t periph_event_cb(audio_event_iface_msg_t *event, void *context) {
+    audio_board_handle_t board_handle = (audio_board_handle_t)context;
+    if (event->source_type == PERIPH_ID_ENCODER) {
+        if (event->cmd == PERIPH_ENCODER_CW) {
+            player_volume += 5;
+            if (player_volume > 100) {
+                player_volume = 100;
+            }
+            audio_hal_set_volume(board_handle->audio_hal, player_volume);
+        } else if (event->cmd == PERIPH_ENCODER_CCW) {
+            // ESP_LOGI(TAG, "[ * ] [Vol-] input key event");
+            player_volume -= 5;
+            if (player_volume < 0) {
+                player_volume = 0;
+            }
+            audio_hal_set_volume(board_handle->audio_hal, player_volume);
+            // ESP_LOGI(TAG, "[ * ] Volume set to %d %%", player_volume);
+        }
+    }
+    return ESP_OK;
+}
+
 void app_main(void) {
     esp_log_level_set("*", ESP_LOG_WARN);
     esp_log_level_set(TAG, ESP_LOG_INFO);
@@ -110,6 +120,14 @@ void app_main(void) {
     audio_board_key_init(set);
     audio_board_sdcard_init(set, SD_MODE_1_LINE);
 
+    periph_encoder_cfg_t enc_cfg = {
+        .gpio_a = 38,
+        .gpio_b = 39,
+        .step   = 2,
+    };
+    esp_periph_handle_t encoder = periph_encoder_init(&enc_cfg);
+    esp_periph_start(set, encoder);
+
     ESP_LOGI(TAG, "[3.2] Set up a sdcard playlist and scan sdcard music save to it");
     sdcard_list_create(&sdcard_list_handle);
     sdcard_scan(sdcard_url_save_cb, "/sdcard", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
@@ -117,6 +135,7 @@ void app_main(void) {
 
     ESP_LOGI(TAG, "[ 1 ] Start audio codec chip");
     audio_board_handle_t board_handle = audio_board_init();
+    esp_periph_set_register_callback(set, periph_event_cb, (void *)board_handle);
     audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_DECODE, AUDIO_HAL_CTRL_START);
     audio_hal_get_volume(board_handle->audio_hal, &player_volume);
 
@@ -172,6 +191,8 @@ void app_main(void) {
     while (1) {
         audio_event_iface_msg_t msg;
         esp_err_t ret = audio_event_iface_listen(evt, &msg, portMAX_DELAY);
+        // ESP_LOGE(TAG, "EVENT source_type=%d cmd=%d data=%d", 
+        //      msg.source_type, msg.cmd, (int)msg.data);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
             continue;
