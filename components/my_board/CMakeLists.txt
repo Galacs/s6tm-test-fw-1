@@ -8,7 +8,7 @@ list(APPEND COMPONENT_ADD_INCLUDEDIRS ./my_board_v1_0 ./tlv320aic31xx)
 set(COMPONENT_SRCS
 ./my_board_v1_0/board.c
 ./my_board_v1_0/board_pins_config.c
-./tlv320aic31xx/tlv320aic31xx_adf.c
+./tlv320aic31xx/tlv320aic31xx.c
 )
 endif()
 

@@ -9,7 +9,7 @@
 /* ADF board layer – provides get_i2c_pins() */
 #include "board.h"
 
-#include "tlv320aic31xx_adf.h"
+#include "tlv320aic31xx.h"
 
 static const char *TAG = "tlv320";
 
