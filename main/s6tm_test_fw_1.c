@@ -143,12 +143,13 @@ void init_lvgl(void) {
     ESP_ERROR_CHECK(esp_lv_adapter_init(&cfg));
 
     // Step 2: Register a display (choose macro by interface)
-    esp_lv_adapter_display_config_t disp_cfg = ESP_LV_ADAPTER_DISPLAY_SPI_WITHOUT_PSRAM_DEFAULT_CONFIG(
-        panel,           // LCD panel handle
-        panel_io,        // LCD panel IO handle (can be NULL for some interfaces)
-        128,             // Horizontal resolution
-        64,             // Vertical resolution
-        ESP_LV_ADAPTER_ROTATE_0 // Rotation
+    esp_lv_adapter_display_config_t disp_cfg = ESP_LV_ADAPTER_DISPLAY_SPI_MONO_DEFAULT_CONFIG(
+        panel,
+        panel_io,
+        128,
+        64,
+        ESP_LV_ADAPTER_ROTATE_0,
+        ESP_LV_ADAPTER_MONO_LAYOUT_VTILED
     );
     lv_display_t *disp = esp_lv_adapter_register_display(&disp_cfg);
     assert(disp != NULL);
@@ -166,7 +167,7 @@ void init_lvgl(void) {
     // Step 5: Draw with LVGL (guarded by adapter lock for thread safety)
     if (esp_lv_adapter_lock(-1) == ESP_OK) {
         lv_obj_t *label = lv_label_create(lv_scr_act());
-        lv_label_set_text(label, "Hello LVGL!");
+        lv_label_set_text(label, "Hello LVGL !");
         lv_obj_center(label);
         esp_lv_adapter_unlock();
     }
