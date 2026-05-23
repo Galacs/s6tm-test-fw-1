@@ -15,17 +15,18 @@
 #include "esp_peripherals.h"
 #include "input_key_service.h"
 #include "periph_button.h"
-#include "board.h"
 #include "periph_encoder.h"
 #include "equalizer.h"
-
 #include "sdcard_list.h"
 #include "sdcard_scan.h"
+
+#include "board.h"
+#include "sine_generator.h"
 
 static const char *TAG = "S6TM_MAIN";
 
 audio_pipeline_handle_t pipeline;
-audio_element_handle_t i2s_stream_writer, mp3_decoder, fatfs_stream_reader, equalizer;
+audio_element_handle_t i2s_stream_writer, mp3_decoder, fatfs_stream_reader, equalizer, sine;
 playlist_operator_handle_t sdcard_list_handle = NULL;
 
 int player_volume;
@@ -153,8 +154,15 @@ void app_main(void) {
     mp3_decoder_cfg_t mp3_cfg = DEFAULT_MP3_DECODER_CONFIG();
     mp3_decoder = mp3_decoder_init(&mp3_cfg);
 
+    sine_generator_cfg_t sine_cfg = SINE_GENERATOR_DEFAULT_CONFIG();
+    sine_cfg.frequency   = 440.0f; 
+    sine_cfg.amplitude   = 0.5f;
+    sine_cfg.sample_rate = 44100;
+    audio_element_handle_t sine = sine_generator_init(&sine_cfg);
+
+
     equalizer_cfg_t eq_cfg = DEFAULT_EQUALIZER_CONFIG();
-    int set_gain[] = { -13, -13, -13, -13, -13, -13, -13, -13, -13, -13,
+    int set_gain[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     eq_cfg.set_gain = set_gain;
     equalizer = equalizer_init(&eq_cfg);
@@ -173,14 +181,18 @@ void app_main(void) {
     audio_element_set_uri(fatfs_stream_reader, url);
 
     ESP_LOGI(TAG, "[2.3] Register all elements to audio pipeline");
-    audio_pipeline_register(pipeline, fatfs_stream_reader, "file");
-    audio_pipeline_register(pipeline, mp3_decoder, "mp3");
-    audio_pipeline_register(pipeline, equalizer, "equalizer");
+    audio_pipeline_register(pipeline, sine, "sine");
     audio_pipeline_register(pipeline, i2s_stream_writer, "i2s");
+    // audio_pipeline_register(pipeline, fatfs_stream_reader, "file");
+    // audio_pipeline_register(pipeline, mp3_decoder, "mp3");
+    // audio_pipeline_register(pipeline, equalizer, "equalizer");
+    // audio_pipeline_register(pipeline, i2s_stream_writer, "i2s");
 
-    ESP_LOGI(TAG, "[2.4] Link it together [sd]-->file-->mp3_decoder-->equalizer-->i2s_stream-->[codec_chip]");
-    const char *link_tag[4] = {"file", "mp3", "equalizer", "i2s"};
-    audio_pipeline_link(pipeline, &link_tag[0], 4);
+    // ESP_LOGI(TAG, "[2.4] Link it together [sd]-->file-->mp3_decoder-->equalizer-->i2s_stream-->[codec_chip]");
+    const char *link_tag[2] = {"sine", "i2s"};
+    audio_pipeline_link(pipeline, &link_tag[0], 2);
+    // const char *link_tag[4] = {"file", "mp3", "equalizer", "i2s"};
+    // audio_pipeline_link(pipeline, &link_tag[0], 4);
 
     ESP_LOGI(TAG, "[ 4 ] Set up  event listener");
     audio_event_iface_cfg_t evt_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
@@ -191,6 +203,8 @@ void app_main(void) {
 
     ESP_LOGI(TAG, "[ 5.1 ] Start audio_pipeline");
     audio_hal_set_volume(board_handle->audio_hal, 20);
+    i2s_stream_set_clk(i2s_stream_writer, 44100, 16, 2);
+    audio_pipeline_run(pipeline);
 
     while (1) {
         audio_event_iface_msg_t msg;
@@ -212,7 +226,8 @@ void app_main(void) {
                 if (equalizer_set_info(equalizer, music_info.sample_rates, music_info.channels) != ESP_OK) {
                     break;
                 }
-                i2s_stream_set_clk(i2s_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
+                // i2s_stream_set_clk(i2s_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
+                i2s_stream_set_clk(i2s_stream_writer, 44100, 16, 2);
                 continue;
             }
             // Advance to the next song when previous finishes
