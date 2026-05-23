@@ -69,10 +69,6 @@ static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_ser
                 audio_pipeline_reset_elements(pipeline);
                 audio_pipeline_run(pipeline);
                 break;
-            case INPUT_KEY_USER_ID_VOLUP:
-                break;
-            case INPUT_KEY_USER_ID_VOLDOWN:
-                break;
         }
     }
 

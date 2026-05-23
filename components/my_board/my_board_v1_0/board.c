@@ -57,8 +57,7 @@ audio_hal_handle_t audio_board_codec_init(void)
 esp_err_t audio_board_key_init(esp_periph_set_handle_t set)
 {
     periph_button_cfg_t btn_cfg = {
-        .gpio_mask = (1ULL << get_input_volup_id()) |
-                     (1ULL << get_input_voldown_id()) |
+        .gpio_mask = (1ULL << get_input_set_id()) |
                      (1ULL << get_input_play_id()),
     };
     esp_periph_handle_t button_handle = periph_button_init(&btn_cfg);
