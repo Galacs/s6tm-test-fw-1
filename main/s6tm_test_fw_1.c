@@ -223,44 +223,6 @@ void app_main(void) {
         }
     }
 
-
-    // while (1) {
-    //     audio_event_iface_msg_t msg;
-    //     if (audio_event_iface_listen(evt, &msg, portMAX_DELAY) != ESP_OK) {
-    //         continue;
-    //     }
-
-    //     if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT && msg.source == (void *) mp3_decoder
-    //         && msg.cmd == AEL_MSG_CMD_REPORT_MUSIC_INFO) {
-    //         audio_element_info_t music_info = {0};
-    //         audio_element_getinfo(mp3_decoder, &music_info);
-    //         ESP_LOGI(TAG, "[ * ] Receive music info from mp3 decoder, sample_rates=%d, bits=%d, ch=%d",
-    //                  music_info.sample_rates, music_info.bits, music_info.channels);
-    //         i2s_stream_set_clk(i2s_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
-    //         continue;
-    //     }
-
-    //     if (msg.source_type == PERIPH_ID_BUTTON && msg.cmd == PERIPH_BUTTON_PRESSED) {
-    //         if ((int) msg.data == get_input_volup_id()) {
-    //             ESP_LOGI(TAG, "[ * ] [Vol+] touch tap event");
-    //             player_volume += 10;
-    //             if (player_volume > 100) {
-    //                 player_volume = 100;
-    //             }
-    //             // audio_hal_set_volume(board_handle->audio_hal, player_volume);
-    //             ESP_LOGI(TAG, "[ * ] Volume set to %d %%", player_volume);
-    //         } else if ((int) msg.data == get_input_voldown_id()) {
-    //             ESP_LOGI(TAG, "[ * ] [Vol-] touch tap event");
-    //             player_volume -= 10;
-    //             if (player_volume < 0) {
-    //                 player_volume = 0;
-    //             }
-    //             // audio_hal_set_volume(board_handle->audio_hal, player_volume);
-    //             ESP_LOGI(TAG, "[ * ] Volume set to %d %%", player_volume);
-    //         }
-    //     }
-    // }
-
     ESP_LOGI(TAG, "[ 6 ] Stop audio_pipeline");
     audio_pipeline_stop(pipeline);
     audio_pipeline_wait_for_stop(pipeline);
