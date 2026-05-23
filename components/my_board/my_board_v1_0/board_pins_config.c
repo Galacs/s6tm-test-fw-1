@@ -140,26 +140,3 @@ int8_t get_input_mute_id(void)
 {
     return BUTTON_MUTE_ID;
 }
-
-// // codec hardware reset (active-low)
-// int8_t get_codec_rst_gpio(void)
-// {
-//     return CODEC_RST_GPIO;
-// }
-
-// // ES7243 MCLK gpio – not used on this board, return -1
-// int8_t get_es7243_mclk_gpio(void)
-// {
-//     return -1;
-// }
-
-// // ES8388 stubs – not used on this board
-// int8_t get_es8388_adc_input(void)
-// {
-//     return -1;
-// }
-
-// int8_t get_es8388_dac_output(void)
-// {
-//     return -1;
-// }
