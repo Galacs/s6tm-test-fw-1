@@ -17,6 +17,9 @@ static const char *TAG = "tlv320";
 #define AIC_I2C_ADDR    0x18   /* ADDR pin tied to GND; use 0x19 if tied to VDD */
 #define AIC_I2C_FREQ    100000
 
+#define MIN_VOL_DB -60
+#define MAX_VOL_DB -20
+
 esp_err_t tlv_320_set_page(uint8_t page);
 
 /* ── ADF HAL handle ──────────────────────────────────────────────────────── */
@@ -45,24 +48,6 @@ esp_err_t tlv320_ctrl_state(audio_hal_codec_mode_t mode, audio_hal_ctrl_t ctrl_s
 
 esp_err_t tlv320_config_i2s(audio_hal_codec_mode_t mode, audio_hal_codec_i2s_iface_t *iface)
 {
-    return ESP_OK;
-}
-
-esp_err_t tlv320_set_mute(bool mute)
-{
-    /* DACMUTE bits[3:2]: 11=muted, 00=unmuted */
-    // return aic_write(AIC_DACMUTE, mute ? 0x0C : 0x00);
-    return ESP_OK;
-}
-
-esp_err_t tlv320_set_volume(int volume)
-{
-    return ESP_OK;
-}
-
-esp_err_t tlv320_get_volume(int *volume)
-{
-    *volume = 80;   /* read-back omitted for brevity */
     return ESP_OK;
 }
 
@@ -138,7 +123,6 @@ static int tlv320_read_reg(uint8_t reg)
 esp_err_t tlv_320_set_page(uint8_t page) {
     if (current_page == page)
         return ESP_OK;
-    ESP_LOGW(TAG, "INFO Set Page: %d", page);
     current_page = page;
     uint8_t reg = PAGE_CTRL_REGISTER;
     return i2c_bus_write_bytes(tlv320_handle.i2c_handle,
@@ -471,5 +455,36 @@ esp_err_t tlv320_init(audio_hal_codec_config_t *cfg) {
     // tlv320_set_speaker_gain(0.0f);
     // tlv320_set_speaker_volume(0.0f);
 
+    return ESP_OK;
+}
+
+esp_err_t tlv320_set_mute(bool mute) {
+    tlv320_set_headphone_mute(mute);
+    tlv320_set_speaker_mute(mute);
+    return ESP_OK;
+}
+
+esp_err_t tlv320_set_volume(int volume) {
+    if (volume < 0) volume = 0;
+    if (volume > 100) volume = 100;
+    if (volume == 0) {
+        tlv320_set_dac_mute(true);
+        return ESP_OK;
+    }
+    tlv320_set_dac_mute(false);
+    float dB = MIN_VOL_DB + (MAX_VOL_DB - MIN_VOL_DB) * (volume / 100.0f);
+    tlv320_set_headphone_volume(dB, dB);
+    return ESP_OK;
+}
+
+esp_err_t tlv320_get_volume(int *volume) {
+    if (volume == NULL) return ESP_ERR_INVALID_ARG;
+    uint8_t reg = tlv320_read_reg(AIC31XX_LANALOGHPL);
+    float dB = analogGainTable[reg];
+    int vol = (dB - MIN_VOL_DB)/ (MAX_VOL_DB - MIN_VOL_DB* 100.0f);
+
+    if (vol < 0)   vol = 0;
+    if (vol > 100) vol = 100;
+    *volume = vol;
     return ESP_OK;
 }

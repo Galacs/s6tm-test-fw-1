@@ -25,8 +25,8 @@
 #ifndef _AUDIO_BOARD_DEFINITION_H_
 #define _AUDIO_BOARD_DEFINITION_H_
 
-#define BUTTON_VOLUP_ID           -1
-#define BUTTON_VOLDOWN_ID         -1
+#define BUTTON_VOLUP_ID            4
+#define BUTTON_VOLDOWN_ID          3
 #define BUTTON_MUTE_ID            -1
 #define BUTTON_SET_ID             -1
 #define BUTTON_MODE_ID            -1
@@ -36,15 +36,7 @@
 #define BATTERY_DETECT_GPIO       -1
 #define SDCARD_INTR_GPIO          -1
 
-/*
- * TLV320AIC31xx hardware reset pin (active-low).
- * Pull low for ≥10 ms, then high; the codec requires ≥1 ms after release
- * before the first I2C transaction (datasheet section 5.2).
- * Set to -1 to skip the GPIO reset (software-reset only via reg 0x01).
- */
-#define CODEC_RST_GPIO            16
-
-#define SDCARD_OPEN_FILE_NUM_MAX  5
+#define SDCARD_OPEN_FILE_NUM_MAX   5
 
 #define BOARD_PA_GAIN             (10) /* Power amplifier gain defined by board (dB) */
 
@@ -76,28 +68,18 @@ extern audio_hal_func_t AUDIO_TLV320AIC31XX_DEFAULT_HANDLE;
         },                                              \
 };
 
-#define INPUT_KEY_NUM     4             /* You need to define the number of input buttons on your board */
+#define INPUT_KEY_NUM     2             /* You need to define the number of input buttons on your board */
 
 #define INPUT_KEY_DEFAULT_INFO() {                      \
     {                                                   \
-        .type = PERIPH_ID_ADC_BTN,                      \
+        .type = PERIPH_ID_BUTTON,                       \
         .user_id = INPUT_KEY_USER_ID_VOLUP,             \
         .act_id = BUTTON_VOLUP_ID,                      \
     },                                                  \
     {                                                   \
-        .type = PERIPH_ID_ADC_BTN,                      \
+        .type = PERIPH_ID_BUTTON,                       \
         .user_id = INPUT_KEY_USER_ID_VOLDOWN,           \
         .act_id = BUTTON_VOLDOWN_ID,                    \
-    },                                                  \
-    {                                                   \
-        .type = PERIPH_ID_ADC_BTN,                      \
-        .user_id = INPUT_KEY_USER_ID_MUTE,              \
-        .act_id = BUTTON_MUTE_ID,                       \
-    },                                                  \
-    {                                                   \
-        .type = PERIPH_ID_ADC_BTN,                      \
-        .user_id = INPUT_KEY_USER_ID_SET,               \
-        .act_id = BUTTON_SET_ID,                        \
     },                                                  \
 }
 
