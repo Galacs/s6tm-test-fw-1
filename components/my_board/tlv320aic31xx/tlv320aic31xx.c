@@ -106,7 +106,6 @@ static int tlv320_write_reg(uint8_t reg, uint8_t value) {
 static int tlv320_read_reg(uint8_t reg)
 {
     uint8_t page = tlv320_get_page(reg);
-    uint8_t value = 0;
     tlv_320_set_page(page);
     uint8_t reg_addr = tlv_320_get_register(reg);
     uint8_t data;
