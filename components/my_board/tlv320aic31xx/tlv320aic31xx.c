@@ -15,7 +15,7 @@ static const char *TAG = "tlv320";
 
 #define AIC_I2C_PORT    I2C_NUM_0
 #define AIC_I2C_ADDR    0x18   /* ADDR pin tied to GND; use 0x19 if tied to VDD */
-#define AIC_I2C_FREQ    100000
+#define AIC_I2C_FREQ    400000
 
 #define MIN_VOL_DB -60
 #define MAX_VOL_DB 0

@@ -138,7 +138,7 @@ void init_lvgl(void) {
     esp_lcd_panel_io_handle_t panel_io = NULL;
     esp_lcd_panel_io_i2c_config_t io_config = {
         .dev_addr = 0x3C,
-        .scl_speed_hz = 100000,
+        .scl_speed_hz = 400000,
         .control_phase_bytes = 1,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
