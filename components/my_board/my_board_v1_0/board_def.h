@@ -29,7 +29,7 @@
 #define BUTTON_VOLDOWN_ID         -1
 #define BUTTON_MUTE_ID            -1
 #define BUTTON_SET_ID              4
-#define BUTTON_MODE_ID            -1
+#define BUTTON_MODE_ID            40
 #define BUTTON_PLAY_ID             3
 #define PA_ENABLE_GPIO            -1
 #define ADC_DETECT_GPIO           -1
@@ -68,7 +68,7 @@ extern audio_hal_func_t AUDIO_TLV320AIC31XX_DEFAULT_HANDLE;
         },                                              \
 };
 
-#define INPUT_KEY_NUM     2             /* You need to define the number of input buttons on your board */
+#define INPUT_KEY_NUM     3             /* You need to define the number of input buttons on your board */
 
 #define INPUT_KEY_DEFAULT_INFO() {                      \
     {                                                   \
@@ -80,6 +80,11 @@ extern audio_hal_func_t AUDIO_TLV320AIC31XX_DEFAULT_HANDLE;
         .type = PERIPH_ID_BUTTON,                       \
         .user_id = INPUT_KEY_USER_ID_PLAY,              \
         .act_id = BUTTON_PLAY_ID,                       \
+    },                                                  \
+    {                                                   \
+        .type = PERIPH_ID_BUTTON,                       \
+        .user_id = INPUT_KEY_USER_ID_MODE,              \
+        .act_id = BUTTON_MODE_ID,                       \
     },                                                  \
 }
 

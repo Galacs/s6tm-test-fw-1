@@ -34,7 +34,41 @@ audio_pipeline_handle_t pipeline;
 audio_element_handle_t i2s_stream_writer, mp3_decoder, fatfs_stream_reader, equalizer;
 playlist_operator_handle_t sdcard_list_handle = NULL;
 
-int player_volume = 10;
+int player_volume = 20;
+
+typedef enum {
+    MODE_VOLUME,
+    MODE_EQ_ADJUST,
+} encoder_mode_t;
+
+static encoder_mode_t s_mode       = MODE_VOLUME;
+static int            s_eq_band    = 0;
+static int            s_eq_gain[10] = {0};
+static lv_obj_t      *s_vol_bar    = NULL;
+static lv_obj_t      *s_eq_bars[10] = {NULL};
+static lv_obj_t      *s_mode_label = NULL;
+static lv_obj_t      *s_band_label = NULL;
+
+typedef enum {
+    UI_UPDATE_VOLUME,
+    UI_UPDATE_EQ_BAND,
+    UI_UPDATE_MODE,
+} ui_update_type_t;
+
+typedef struct {
+    ui_update_type_t type;
+    int volume;
+    int band;
+    int band_gain;
+    encoder_mode_t mode;
+} ui_update_t;
+
+static QueueHandle_t s_ui_queue = NULL;
+
+// EQ band center frequencies for display
+static const char *eq_band_names[] = {
+    "31","62","125","250","500","1k","2k","4k","8k","16k"
+};
 
 void update_title(char* msg) {
     if (esp_lv_adapter_lock(-1) == ESP_OK) {
@@ -55,47 +89,114 @@ static const char* url_to_title(const char *url) {
     return buf;
 }
 
+static void ui_set_volume(int vol) {
+    if (esp_lv_adapter_lock(-1) != ESP_OK) return;
+    lv_bar_set_value(s_vol_bar, vol, LV_ANIM_OFF);
+    esp_lv_adapter_unlock();
+}
+
+static void ui_set_eq_band(int band, int gain) {
+    if (esp_lv_adapter_lock(-1) != ESP_OK) return;
+    lv_bar_set_value(s_eq_bars[band], gain, LV_ANIM_OFF);
+    esp_lv_adapter_unlock();
+}
+
+static void ui_set_mode(encoder_mode_t mode, int band) {
+    if (esp_lv_adapter_lock(-1) != ESP_OK) return;
+    switch (mode) {
+        case MODE_VOLUME:
+            lv_label_set_text(s_mode_label, "VOL");
+            lv_label_set_text(s_band_label, "");
+            lv_obj_remove_flag(label, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(s_band_label, LV_OBJ_FLAG_HIDDEN);
+            break;
+        case MODE_EQ_ADJUST:
+            lv_label_set_text(s_mode_label, "EQ=");
+            lv_label_set_text_fmt(s_band_label, "%s %+ddB",
+                                  eq_band_names[band], s_eq_gain[band]);
+            lv_obj_add_flag(label, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(s_band_label, LV_OBJ_FLAG_HIDDEN);
+            break;
+    }
+    esp_lv_adapter_unlock();
+}
+
 static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_service_event_t *evt, void *ctx) {
     audio_board_handle_t board_handle = (audio_board_handle_t) ctx;
-    ESP_LOGE(TAG, "CB fired type=%d data=%d", evt->type, (int)evt->data);
+    ui_update_t upd = {0};
+    // ESP_LOGE(TAG, "CB fired type=%d data=%d", evt->type, (int)evt->data);
     if (evt->type == INPUT_KEY_SERVICE_ACTION_CLICK_RELEASE) {
-        ESP_LOGI(TAG, "[ * ] input key id is %d", (int)evt->data);
+        // ESP_LOGI(TAG, "[ * ] input key id is %d", (int)evt->data);
         switch ((int)evt->data) {
             case INPUT_KEY_USER_ID_PLAY:
-                ESP_LOGI(TAG, "[ * ] [Play] input key event");
-                audio_element_state_t el_state = audio_element_get_state(i2s_stream_writer);
-                switch (el_state) {
-                    case AEL_STATE_INIT :
-                        ESP_LOGI(TAG, "[ * ] Starting audio pipeline");
-                        audio_pipeline_run(pipeline);
-                        break;
-                    case AEL_STATE_RUNNING :
-                        ESP_LOGI(TAG, "[ * ] Pausing audio pipeline");
-                        audio_pipeline_pause(pipeline);
-                        break;
-                    case AEL_STATE_PAUSED :
-                        ESP_LOGI(TAG, "[ * ] Resuming audio pipeline");
-                        audio_pipeline_resume(pipeline);
-                        break;
-                    default :
-                        ESP_LOGI(TAG, "[ * ] Not supported state %d", el_state);
+                if (s_mode == MODE_VOLUME) {
+                    ESP_LOGI(TAG, "[ * ] [Play] input key event");
+                    audio_element_state_t el_state = audio_element_get_state(i2s_stream_writer);
+                    switch (el_state) {
+                        case AEL_STATE_INIT :
+                            ESP_LOGI(TAG, "[ * ] Starting audio pipeline");
+                            audio_pipeline_run(pipeline);
+                            break;
+                        case AEL_STATE_RUNNING :
+                            ESP_LOGI(TAG, "[ * ] Pausing audio pipeline");
+                            audio_pipeline_pause(pipeline);
+                            break;
+                        case AEL_STATE_PAUSED :
+                            ESP_LOGI(TAG, "[ * ] Resuming audio pipeline");
+                            audio_pipeline_resume(pipeline);
+                            break;
+                        default :
+                            ESP_LOGI(TAG, "[ * ] Not supported state %d", el_state);
+                    }
+                } else {
+                    s_eq_band--;
+                    if (s_eq_band < 0) s_eq_band = 9;
+                    upd.type = UI_UPDATE_MODE;
+                    upd.mode = s_mode;
+                    upd.band = s_eq_band;
+                    xQueueOverwrite(s_ui_queue, &upd);
+                    break;
                 }
                 break;
             case INPUT_KEY_USER_ID_SET:
-                ESP_LOGI(TAG, "[ * ] [Set] input key event");
-                ESP_LOGI(TAG, "[ * ] Stopped, advancing to the next song");
-                char *url = NULL;
-                audio_pipeline_stop(pipeline);
-                audio_pipeline_wait_for_stop(pipeline);
-                audio_pipeline_terminate(pipeline);
-                sdcard_list_next(sdcard_list_handle, 1, &url);
-                ESP_LOGW(TAG, "URL: %s", url);
-                update_title(url_to_title(url));
-                audio_element_set_uri(fatfs_stream_reader, url);
-                audio_pipeline_reset_ringbuffer(pipeline);
-                audio_pipeline_reset_elements(pipeline);
-                audio_pipeline_run(pipeline);
+                if (s_mode == MODE_VOLUME) {
+                    ESP_LOGI(TAG, "[ * ] [Set] input key event");
+                    ESP_LOGI(TAG, "[ * ] Stopped, advancing to the next song");
+                    char *url = NULL;
+                    audio_pipeline_stop(pipeline);
+                    audio_pipeline_wait_for_stop(pipeline);
+                    audio_pipeline_terminate(pipeline);
+                    sdcard_list_next(sdcard_list_handle, 1, &url);
+                    ESP_LOGW(TAG, "URL: %s", url);
+                    update_title(url_to_title(url));
+                    audio_element_set_uri(fatfs_stream_reader, url);
+                    audio_pipeline_reset_ringbuffer(pipeline);
+                    audio_pipeline_reset_elements(pipeline);
+                    audio_pipeline_run(pipeline);
+                } else {
+                    s_eq_band++;
+                    if (s_eq_band > 9) s_eq_band = 0;
+                    upd.type = UI_UPDATE_MODE;
+                    upd.mode = s_mode;
+                    upd.band = s_eq_band;
+                    xQueueOverwrite(s_ui_queue, &upd);
+                    break;
+                }
                 break;
+            case INPUT_KEY_USER_ID_MODE:
+                switch (s_mode) {
+                case MODE_VOLUME:
+                    s_mode = MODE_EQ_ADJUST;
+                    break;
+                case MODE_EQ_ADJUST:
+                    s_mode = MODE_VOLUME;
+                    break;
+                }
+                upd.type = UI_UPDATE_MODE;
+                upd.mode = s_mode;
+                upd.band = s_eq_band;
+                xQueueOverwrite(s_ui_queue, &upd);
+            break;
         }
     }
 
@@ -112,24 +213,86 @@ void sdcard_url_save_cb(void *user_data, char *url) {
 
 static esp_err_t periph_event_cb(audio_event_iface_msg_t *event, void *context) {
     audio_board_handle_t board_handle = (audio_board_handle_t)context;
+    ui_update_t upd = {0};
     if (event->source_type == PERIPH_ID_ENCODER) {
-        if (event->cmd == PERIPH_ENCODER_CW) {
-            player_volume += 2;
-            if (player_volume > 100) {
-                player_volume = 100;
-            }
-            audio_hal_set_volume(board_handle->audio_hal, player_volume);
-        } else if (event->cmd == PERIPH_ENCODER_CCW) {
-            // ESP_LOGI(TAG, "[ * ] [Vol-] input key event");
-            player_volume -= 2;
-            if (player_volume < 0) {
-                player_volume = 0;
-            }
-            audio_hal_set_volume(board_handle->audio_hal, player_volume);
-            // ESP_LOGI(TAG, "[ * ] Volume set to %d %%", player_volume);
+        int dir = (event->cmd == PERIPH_ENCODER_CW) ? 1 : -1;
+        switch (s_mode) {
+            case MODE_VOLUME:
+                player_volume += dir * 2;
+                if (player_volume > 100) player_volume = 100;
+                if (player_volume < 0)   player_volume = 0;
+                audio_hal_set_volume(board_handle->audio_hal, player_volume);
+                upd.type   = UI_UPDATE_VOLUME;
+                upd.volume = player_volume;
+                xQueueOverwrite(s_ui_queue, &upd);
+                break;
+
+            case MODE_EQ_ADJUST:
+                s_eq_gain[s_eq_band] += dir;
+                if (s_eq_gain[s_eq_band] >  13) s_eq_gain[s_eq_band] =  13;
+                if (s_eq_gain[s_eq_band] < -13) s_eq_gain[s_eq_band] = -13;
+                upd.type = UI_UPDATE_EQ_BAND;
+                upd.band = s_eq_band;
+                upd.band_gain = s_eq_gain[s_eq_band];
+                upd.mode = s_mode;
+                xQueueOverwrite(s_ui_queue, &upd);
+                break;
         }
     }
     return ESP_OK;
+}
+
+void init_ui(void) {
+    if (esp_lv_adapter_lock(-1) != ESP_OK) return;
+
+    lv_obj_t *scr = lv_scr_act();
+
+    // mode label top left
+    s_mode_label = lv_label_create(scr);
+    lv_obj_align(s_mode_label, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_label_set_text(s_mode_label, "VOL");
+
+    label = lv_label_create(scr);
+    lv_obj_set_width(label, 90);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_label_set_text(label, "Lecture SD...");
+    lv_obj_align(label, LV_ALIGN_TOP_MID, 10, 0);
+
+    s_vol_bar = lv_bar_create(scr);
+    lv_obj_set_size(s_vol_bar, 4, 60);
+    lv_bar_set_range(s_vol_bar, 0, 100);
+    lv_bar_set_value(s_vol_bar, player_volume, LV_ANIM_OFF);
+    lv_bar_set_mode(s_vol_bar, LV_BAR_MODE_NORMAL);
+
+    // this is the key — tell LVGL to draw it vertically
+    lv_obj_set_style_bg_color(s_vol_bar, lv_color_white(), LV_PART_MAIN);
+
+    lv_obj_align(s_vol_bar, LV_ALIGN_RIGHT_MID, 0, 0);
+
+    // EQ bars — 10 small vertical bars across bottom
+    int bar_w = 8;
+    int bar_h = 40;
+    int spacing = 12;
+    int start_x = 2;
+    for (int i = 0; i < 10; i++) {
+        s_eq_bars[i] = lv_bar_create(scr);
+        lv_obj_set_size(s_eq_bars[i], bar_w, bar_h);
+        lv_bar_set_range(s_eq_bars[i], -13, 13);
+        lv_bar_set_value(s_eq_bars[i], 0, LV_ANIM_OFF);
+        lv_obj_set_style_bg_color(s_eq_bars[i], lv_color_white(), LV_PART_MAIN);
+        lv_obj_align(s_eq_bars[i], LV_ALIGN_BOTTOM_LEFT,
+                     start_x + i * spacing, -5);
+    }
+
+    // band label bottom right
+    s_band_label = lv_label_create(scr);
+    lv_obj_add_flag(s_band_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_width(s_band_label, 90);
+    lv_label_set_long_mode(s_band_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_label_set_text(s_band_label, "Lecture SD...");
+    lv_obj_align(s_band_label, LV_ALIGN_TOP_MID, 10, 0);
+
+    esp_lv_adapter_unlock();
 }
 
 void init_lvgl(void) {
@@ -185,21 +348,13 @@ void init_lvgl(void) {
 
     // Step 4: Start the adapter task
     ESP_ERROR_CHECK(esp_lv_adapter_start());
-
-    // Step 5: Draw with LVGL (guarded by adapter lock for thread safety)
-    if (esp_lv_adapter_lock(-1) == ESP_OK) {
-        label = lv_label_create(lv_scr_act());
-        lv_label_set_text(label, "Démarrage...");
-        lv_obj_set_width(label, 100);
-        lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-        lv_obj_center(label);
-        esp_lv_adapter_unlock();
-    }
 }
 
 void app_main(void) {
     esp_log_level_set("*", ESP_LOG_WARN);
     esp_log_level_set(TAG, ESP_LOG_INFO);
+
+    s_ui_queue = xQueueCreate(1, sizeof(ui_update_t));
 
     ESP_LOGI(TAG, "[ 3 ] Initialize peripherals");
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
@@ -222,6 +377,7 @@ void app_main(void) {
     audio_hal_get_volume(board_handle->audio_hal, &player_volume);
 
     init_lvgl();
+    init_ui();
 
     ESP_LOGI(TAG, "[3.2] Set up a sdcard playlist and scan sdcard music save to it");
     audio_board_sdcard_init(set, SD_MODE_1_LINE);
@@ -285,15 +441,58 @@ void app_main(void) {
 
     ESP_LOGI(TAG, "[ 5.1 ] Start audio_pipeline");
     audio_hal_set_volume(board_handle->audio_hal, 20);
+    ui_set_volume(20);
     gpio_set_level(21, 0);
 
     while (1) {
+        ui_update_t upd;
+        if (xQueueReceive(s_ui_queue, &upd, 0) == pdTRUE) {
+            switch (upd.type) {
+                case UI_UPDATE_VOLUME:
+                    ui_set_volume(upd.volume);
+                    break;
+                case UI_UPDATE_EQ_BAND: {
+                    int gains[20];
+                    for (int i = 0; i < 10; i++) {
+                        gains[i] = s_eq_gain[i];
+                        gains[i + 10] = s_eq_gain[i];
+                        // lv_obj_set_size(s_eq_bars[i], 9, 40);
+                    }
+                    // lv_obj_set_size(s_eq_bars[upd.band], 10, 40);
+                    ESP_LOGI(TAG, "setting band: %d to %d", upd.band, upd.band_gain);
+                    equalizer_set_gain_info(equalizer, upd.band, upd.band_gain, true);
+                    ui_set_eq_band(upd.band, upd.band_gain);
+                    ui_set_mode(upd.mode, upd.band);
+                    break;
+                }
+                case UI_UPDATE_MODE:
+                    ui_set_mode(upd.mode, upd.band);
+                    if (s_mode == MODE_EQ_ADJUST) {
+                        if (esp_lv_adapter_lock(-1) != ESP_OK) break;
+                        int bar_w = 8;
+                        int bar_h = 40;
+                        int spacing = 12;
+                        int start_x = 2;
+                        for (int i = 0; i < 10; i++) {
+                            lv_obj_set_size(s_eq_bars[i], bar_w, bar_h);
+                            lv_obj_align(s_eq_bars[i], LV_ALIGN_BOTTOM_LEFT,
+                                        start_x + i * spacing, -5);
+                        }
+                        lv_obj_set_size(s_eq_bars[s_eq_band], 10, 40);
+                        lv_obj_align(s_eq_bars[s_eq_band], LV_ALIGN_BOTTOM_LEFT,
+                                    start_x + s_eq_band * spacing - 1, -5);
+                        esp_lv_adapter_unlock();
+                    }
+                    break;
+            }
+        }
+
         audio_event_iface_msg_t msg;
-        esp_err_t ret = audio_event_iface_listen(evt, &msg, portMAX_DELAY);
+        esp_err_t ret = audio_event_iface_listen(evt, &msg,  pdMS_TO_TICKS(10));
         // ESP_LOGE(TAG, "EVENT source_type=%d cmd=%d data=%d", 
         //      msg.source_type, msg.cmd, (int)msg.data);
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
+            // ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
             continue;
         }
         if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT) {
