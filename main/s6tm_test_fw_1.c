@@ -353,6 +353,13 @@ void init_lvgl(void) {
 void app_main(void) {
     esp_log_level_set("*", ESP_LOG_WARN);
     esp_log_level_set(TAG, ESP_LOG_INFO);
+    gpio_config_t io = {
+        .pin_bit_mask = 1ULL << 2 | 1ULL << 4,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
 
     s_ui_queue = xQueueCreate(1, sizeof(ui_update_t));
 
@@ -382,7 +389,11 @@ void app_main(void) {
     ESP_LOGI(TAG, "[3.2] Set up a sdcard playlist and scan sdcard music save to it");
     audio_board_sdcard_init(set, SD_MODE_1_LINE);
     sdcard_list_create(&sdcard_list_handle);
-    sdcard_scan(sdcard_url_save_cb, "/sdcard", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
+    if (gpio_get_level(2) && !gpio_get_level(4)) {
+        sdcard_scan(sdcard_url_save_cb, "/sdcard/jp", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
+    } else {
+        sdcard_scan(sdcard_url_save_cb, "/sdcard", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
+    }
     sdcard_list_show(sdcard_list_handle);
 
     ESP_LOGI(TAG, "[ 3 ] Create and start input key service");
