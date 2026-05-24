@@ -478,7 +478,6 @@ void app_main(void) {
                 }
                 case UI_UPDATE_MODE:
                     ui_set_mode(upd.mode, upd.band);
-                    if (s_mode == MODE_EQ_ADJUST) {
                         if (esp_lv_adapter_lock(-1) != ESP_OK) break;
                         int bar_w = 8;
                         int bar_h = 40;
@@ -489,11 +488,12 @@ void app_main(void) {
                             lv_obj_align(s_eq_bars[i], LV_ALIGN_BOTTOM_LEFT,
                                         start_x + i * spacing, -5);
                         }
+                    if (s_mode == MODE_EQ_ADJUST) {
                         lv_obj_set_size(s_eq_bars[s_eq_band], 10, 40);
                         lv_obj_align(s_eq_bars[s_eq_band], LV_ALIGN_BOTTOM_LEFT,
                                     start_x + s_eq_band * spacing - 1, -5);
-                        esp_lv_adapter_unlock();
                     }
+                    esp_lv_adapter_unlock();
                     break;
             }
         }
