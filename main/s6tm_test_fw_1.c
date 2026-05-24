@@ -391,8 +391,10 @@ void app_main(void) {
     sdcard_list_create(&sdcard_list_handle);
     if (gpio_get_level(2) && !gpio_get_level(4)) {
         sdcard_scan(sdcard_url_save_cb, "/sdcard/jp", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
+    } else if (gpio_get_level(2)) {
+        sdcard_scan(sdcard_url_save_cb, "/sdcard/sine", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
     } else {
-        sdcard_scan(sdcard_url_save_cb, "/sdcard", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
+        sdcard_scan(sdcard_url_save_cb, "/sdcard/", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
     }
     sdcard_list_show(sdcard_list_handle);
 
