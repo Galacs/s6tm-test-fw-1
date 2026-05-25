@@ -43,8 +43,7 @@ typedef enum {
 
 static encoder_mode_t s_mode       = MODE_VOLUME;
 static int            s_eq_band    = 0;
-static int            s_eq_gain[10] = { -5, -6, -3, -22, -13, -17, -11, -3, -1, 0,
-                                        -5, -6, -3, -22, -13, -17, -11, -3, -1, 0};
+static int            s_eq_gain[10] = { -5, -6, -3, -22, -13, -17, -11, -3, -1, 0 };
 static lv_obj_t      *s_vol_bar    = NULL;
 static lv_obj_t      *s_eq_bars[10] = {NULL};
 static lv_obj_t      *s_mode_label = NULL;
@@ -417,8 +416,11 @@ void app_main(void) {
     mp3_decoder = mp3_decoder_init(&mp3_cfg);
 
     equalizer_cfg_t eq_cfg = DEFAULT_EQUALIZER_CONFIG();
-    eq_cfg.set_gain = s_eq_gain;
     equalizer = equalizer_init(&eq_cfg);
+    for (int i = 0; i < 10; i++) {
+        ui_set_eq_band(i, s_eq_gain[i]);
+        equalizer_set_gain_info(equalizer, i, s_eq_gain[i], true);
+    }
 
     ESP_LOGI(TAG, "[2.2] Create i2s stream to write data to codec chip");
     i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
@@ -455,9 +457,6 @@ void app_main(void) {
     audio_hal_set_volume(board_handle->audio_hal, 20);
     ui_set_volume(20);
     gpio_set_level(21, 0);
-    for (int i = 0; i < 10; i++) {
-        ui_set_eq_band(i, s_eq_gain[i]);
-    }
 
     while (1) {
         ui_update_t upd;
