@@ -43,7 +43,8 @@ typedef enum {
 
 static encoder_mode_t s_mode       = MODE_VOLUME;
 static int            s_eq_band    = 0;
-static int            s_eq_gain[10] = {0};
+static int            s_eq_gain[10] = { 4, 3, 6, -13, -4, -8, -2, 6, 8, 9,
+                                        4, 3, 6, -13, -4, -8, -2, 6, 8, 9};
 static lv_obj_t      *s_vol_bar    = NULL;
 static lv_obj_t      *s_eq_bars[10] = {NULL};
 static lv_obj_t      *s_mode_label = NULL;
@@ -394,7 +395,7 @@ void app_main(void) {
     } else if (gpio_get_level(2)) {
         sdcard_scan(sdcard_url_save_cb, "/sdcard/sine", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
     } else {
-        sdcard_scan(sdcard_url_save_cb, "/sdcard/", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
+        sdcard_scan(sdcard_url_save_cb, "/sdcard", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
     }
     sdcard_list_show(sdcard_list_handle);
 
@@ -416,9 +417,7 @@ void app_main(void) {
     mp3_decoder = mp3_decoder_init(&mp3_cfg);
 
     equalizer_cfg_t eq_cfg = DEFAULT_EQUALIZER_CONFIG();
-    int set_gain[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    eq_cfg.set_gain = set_gain;
+    eq_cfg.set_gain = s_eq_gain;
     equalizer = equalizer_init(&eq_cfg);
 
     ESP_LOGI(TAG, "[2.2] Create i2s stream to write data to codec chip");
@@ -456,6 +455,9 @@ void app_main(void) {
     audio_hal_set_volume(board_handle->audio_hal, 20);
     ui_set_volume(20);
     gpio_set_level(21, 0);
+    for (int i = 0; i < 10; i++) {
+        ui_set_eq_band(i, s_eq_gain[i]);
+    }
 
     while (1) {
         ui_update_t upd;
