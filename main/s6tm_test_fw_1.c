@@ -43,8 +43,8 @@ typedef enum {
 
 static encoder_mode_t s_mode       = MODE_VOLUME;
 static int            s_eq_band    = 0;
-static int            s_eq_gain[10] = { 4, 3, 6, -13, -4, -8, -2, 6, 8, 9,
-                                        4, 3, 6, -13, -4, -8, -2, 6, 8, 9};
+static int            s_eq_gain[10] = { -5, -6, -3, -22, -13, -17, -11, -3, -1, 0,
+                                        -5, -6, -3, -22, -13, -17, -11, -3, -1, 0};
 static lv_obj_t      *s_vol_bar    = NULL;
 static lv_obj_t      *s_eq_bars[10] = {NULL};
 static lv_obj_t      *s_mode_label = NULL;
@@ -230,8 +230,8 @@ static esp_err_t periph_event_cb(audio_event_iface_msg_t *event, void *context) 
 
             case MODE_EQ_ADJUST:
                 s_eq_gain[s_eq_band] += dir;
-                if (s_eq_gain[s_eq_band] >  13) s_eq_gain[s_eq_band] =  13;
-                if (s_eq_gain[s_eq_band] < -13) s_eq_gain[s_eq_band] = -13;
+                if (s_eq_gain[s_eq_band] >  5) s_eq_gain[s_eq_band] =  5;
+                if (s_eq_gain[s_eq_band] < -25) s_eq_gain[s_eq_band] = -25;
                 upd.type = UI_UPDATE_EQ_BAND;
                 upd.band = s_eq_band;
                 upd.band_gain = s_eq_gain[s_eq_band];
@@ -278,7 +278,7 @@ void init_ui(void) {
     for (int i = 0; i < 10; i++) {
         s_eq_bars[i] = lv_bar_create(scr);
         lv_obj_set_size(s_eq_bars[i], bar_w, bar_h);
-        lv_bar_set_range(s_eq_bars[i], -13, 13);
+        lv_bar_set_range(s_eq_bars[i], -25, 5);
         lv_bar_set_value(s_eq_bars[i], 0, LV_ANIM_OFF);
         lv_obj_set_style_bg_color(s_eq_bars[i], lv_color_white(), LV_PART_MAIN);
         lv_obj_align(s_eq_bars[i], LV_ALIGN_BOTTOM_LEFT,
