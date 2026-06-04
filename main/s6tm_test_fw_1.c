@@ -43,7 +43,7 @@ typedef enum {
 
 static encoder_mode_t s_mode       = MODE_VOLUME;
 static int            s_eq_band    = 0;
-static int            s_eq_gain[10] = { -5, -6, -3, -22, -13, -17, -11, -3, -1, 0 };
+static int            s_eq_gain[10] = { -1, 0, -6, -9, -8, -6, -8, -5, -4, -1 };
 static lv_obj_t      *s_vol_bar    = NULL;
 static lv_obj_t      *s_eq_bars[10] = {NULL};
 static lv_obj_t      *s_mode_label = NULL;
